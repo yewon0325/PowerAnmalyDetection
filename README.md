@@ -6,3 +6,5 @@
 - [x] 배포 및 유지보수 가능하게 도커화
 
 ## 프로젝트 목표 
+
+![image](https://github.com/user-attachments/assets/cf82929e-ab6d-4c2c-a30f-0b30f35cbfc9)
