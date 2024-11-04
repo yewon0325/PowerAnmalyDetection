@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timedelta
 
 # Firebase 설정 정보
-database_url = 'https://anomaly-detection-9939e-default-rtdb.asia-southeast1.firebasedatabase.app'
+database_url = 
 
 # 데이터 읽기 함수
 def get_data():
