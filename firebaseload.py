@@ -1,67 +1,60 @@
 import requests
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Firebase 설정 정보
 database_url = 
 
-# 데이터 읽기 함수
-def get_data():
+# 새로운 데이터만 읽어오는 함수
+def get_new_data(last_key=None):
     url = f'{database_url}/power_consumption.json'
     response = requests.get(url)
     
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print(f"Error: {response.status_code}")
-        return None
+    if response.status_code != 200:
+        print(f"Error fetching data: {response.status_code}")
+        return None, last_key  # 오류 발생 시, last_key도 반환
 
-# 데이터 처리 함수
-def process_data(data, period="hour"):
-    if data is None:
-        print("No data found.")
-        return [], [], []
-
-    processed_data = {}  # 누적 데이터 저장 딕셔너리
-    timestamps = []  # 누적된 Timestamp 저장
-    adjusted_powers = []  # 누적된 Adjusted Power Consumption 저장
-    cumulative_power = 0  # 누적된 전력 소비량 저장 변수
+    data = response.json()
+    
+    new_data = {}
 
     for key, value in data.items():
-        # 'Power Consumption (kW)' 필드가 없는 경우 건너뛰기
-        if 'Power Consumption (kW)' not in value:
+        # last_key 이후의 데이터만 추가
+        if last_key is None or key > last_key:
+            new_data[key] = value
+
+    # 새로운 데이터가 있으면 가장 최신 key로 last_key 업데이트
+    if new_data:
+        last_key = max(new_data.keys())  # 가장 최신 key로 last_key 설정
+        print(f"새로 감지된 데이터 개수: {len(new_data)} | 업데이트된 last_key: {last_key}")  # 디버깅 정보
+
+    return new_data, last_key
+
+# 데이터 처리 함수
+def process_data(data):
+    if data is None:
+        print("No new data to process.")
+        return [], [], []
+
+    processed_data = []
+    timestamps = []
+    adjusted_powers_kw = []
+
+    for key, value in data.items():
+        if 'Instant Power Consumption (kW)' not in value:
             continue
         
+        # 데이터 처리
         timestamp = value['Timestamp']
-        adjusted_power = float(value['Power Consumption (kW)']) * 1.1  # 전력 소비량을 1.1배로 증가
+        power_kw = float(value['Instant Power Consumption (kW)'])  # kW 단위로 가져옴
+
+        # kW 단위로 저장
+        processed_data.append({
+            'Timestamp': timestamp,
+            'Instant Power Consumption (kW)': power_kw,          
+        })
         
-        # 1시간 단위로 누적 시간까지만 반영
-        dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M")
-        period_key = dt.strftime("%Y-%m-%d %H:00")
+        timestamps.append(timestamp)
+        adjusted_powers_kw.append(power_kw)  # kW 값 저장
 
-        # period_key가 이미 존재하면 누적, 없으면 새로 생성
-        if period_key in processed_data:
-            processed_data[period_key] += adjusted_power
-        else:
-            processed_data[period_key] = adjusted_power
-
-    # 누적 값을 계산 후 adjusted_powers에 추가
-    for period_key in sorted(processed_data.keys()):
-        cumulative_power += processed_data[period_key]
-        adjusted_powers.append(cumulative_power)  # 누적된 값 추가
-        timestamps.append(period_key)
-
-    # 리스트로 변환
-    result = [{"Timestamp": period_key, "Total Adjusted Power Consumption (kW)": cumulative} for period_key, cumulative in zip(timestamps, adjusted_powers)]
-    
-    return result, timestamps, adjusted_powers
-
-# 데이터 읽기 및 처리
-data = get_data()
-
-result, timestamps, adjusted_powers = process_data(data, period="hour")
-
-# 처리된 데이터 출력
-print("Processed Data:", json.dumps(result, indent=2))
-print("Timestamps (Hourly):", timestamps)
-print("Adjusted Power Consumptions (Cumulative):", adjusted_powers)
+    return processed_data, timestamps, adjusted_powers_kw
