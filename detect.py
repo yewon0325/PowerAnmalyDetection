@@ -1,3 +1,13 @@
+#%%
+import time
+from datetime import datetime
+from firebaseload import get_new_data, process_data
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+import requests
+import warnings
+import numpy as np
+import pandas as pd
+
 import time
 import calendar
 from datetime import datetime
@@ -5,6 +15,8 @@ from firebaseload import get_new_data, process_data
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 import requests
 import warnings
+import matplotlib.pyplot as plt
+
 
 # 설정 상수
 TARGET_MONTHLY_COST = 9300 # (경고알람?을 줄)요금 한도 설정 
@@ -31,6 +43,10 @@ last_key = None
 # 이상치와 정상치를 저장할 리스트
 outliers = []
 normal = []
+
+# 60초마다 그래프를 업데이트하는 타이머
+graph_update_interval = 1  # 1초마다 업데이트
+last_graph_update_time = time.time()
 
 #--------------------- 초기 예측 요금 계산 함수 -----------------
 def predict_power_stage(month, last_month_cost):
@@ -131,6 +147,29 @@ last_month_cost = 8000
 pre_month = 5
 hourly_avg_kwh = initial_predict(last_month_cost, pre_month)
 
+# normal과 outliers 리스트를 DataFrame으로 변환
+def save_to_dataframe(normal, outliers):
+    # 두 리스트의 최대 길이를 기준으로 DataFrame 생성
+    max_length = max(len(normal), len(outliers))
+    index = list(range(max_length))
+    
+    # 길이가 짧은 리스트는 NaN으로 채우기
+    normal_extended = normal + [None] * (max_length - len(normal))
+    outliers_extended = outliers + [None] * (max_length - len(outliers))
+    
+    # DataFrame 생성
+    df = pd.DataFrame({
+        'Index' : index,
+        'Normal': normal_extended,
+        'Outliers': outliers_extended
+    })
+    
+    return df
+
+# # 예제 DataFrame 생성
+df = save_to_dataframe(normal, outliers)
+df.to_csv("power_anomaly_detection.csv", index=False)
+
 #-------------------- 데이터 수집 및 예측 루프 -------------------
 while True:
     try:
@@ -152,7 +191,12 @@ while True:
 
             # 현재 날짜를 추출하여 예측에 사용
             today_str = list(new_data.values())[0]['Timestamp']
-            today = datetime.strptime(today_str, "%Y-%m-%d %H:%M:%S")
+            try:
+                today = datetime.strptime(today_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                # 초 부분이 없는 경우의 형식을 사용
+                today = datetime.strptime(today_str, "%Y-%m-%d %H:%M")
+
 
             # 지난 일수 계산
             days_passed = today.day
@@ -167,8 +211,38 @@ while True:
                 print(f"이번달 전력 요금 예측: {predicted_cost:.2f} 원\n")
             else:
                 print("예측이 실패하여 현재 요금을 출력할 수 없습니다.")
+                
+             # 주기적으로 DataFrame으로 저장
+            if len(normal) > 0 or len(outliers) > 0:
+                df = save_to_dataframe(normal, outliers)
+                # print(df)
+                df.to_csv("power_anomaly_detection.csv", index=False)
+                
+                
+             # 주기적으로 그래프 업데이트 
+            if time.time() - last_graph_update_time >= graph_update_interval:
+                df = save_to_dataframe(normal, outliers)
+            
+                outliers_data = df[['Index', 'Outliers']].dropna()
+                normal_data = df[['Index', 'Normal']].dropna()
+                
+                # 그래프 생성
+                plt.figure(figsize=(10, 5))
+                plt.plot(outliers_data['Index'], outliers_data['Outliers'], 'ro', label='Outlier')
+                plt.plot(normal_data['Index'], normal_data['Normal'], 'b-', label='Inlier')
+                
+                # 그래프 제목 및 레이블
+                plt.title('Anomaly Detection')
+                plt.xlabel('Index')
+                plt.ylabel('Predicted Power Consumption Value')
+                plt.legend()
+                plt.show()
+                
+                # 그래프 업데이트 시간을 현재 시간으로 갱신
+                last_graph_update_time = time.time()
         time.sleep(5)
 
     except requests.exceptions.RequestException as e:
         print("데이터 오류:", e)
         time.sleep(5)
+    
