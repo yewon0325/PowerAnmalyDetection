@@ -48,6 +48,18 @@ normal = []
 graph_update_interval = 1  # 1초마다 업데이트
 last_graph_update_time = time.time()
 
+# 초기 그래프 설정
+plt.ion()  # 인터랙티브 모드 활성화
+fig, ax = plt.subplots(figsize=(10, 5))
+
+# 초기 그래프 생성
+line_outliers, = ax.plot([], [], 'ro', label='Outlier')
+line_normal, = ax.plot([], [], 'b-', label='Inlier')
+ax.set_title('Anomaly Detection')
+ax.set_xlabel('Index')
+ax.set_ylabel('Predicted Power Consumption Value')
+ax.legend()
+
 #--------------------- 초기 예측 요금 계산 함수 -----------------
 def predict_power_stage(month, last_month_cost):
     # 각 단계의 중간값 계산
@@ -212,33 +224,29 @@ while True:
             else:
                 print("예측이 실패하여 현재 요금을 출력할 수 없습니다.")
                 
-             # 주기적으로 DataFrame으로 저장
+             # DataFrame 업데이트
             if len(normal) > 0 or len(outliers) > 0:
                 df = save_to_dataframe(normal, outliers)
-                # print(df)
                 df.to_csv("power_anomaly_detection.csv", index=False)
-                
-                
-             # 주기적으로 그래프 업데이트 
+
+            # 주기적으로 그래프 업데이트
             if time.time() - last_graph_update_time >= graph_update_interval:
                 df = save_to_dataframe(normal, outliers)
-            
                 outliers_data = df[['Index', 'Outliers']].dropna()
                 normal_data = df[['Index', 'Normal']].dropna()
+
+                # 기존 그래프 데이터 업데이트
+                line_outliers.set_data(outliers_data['Index'], outliers_data['Outliers'])
+                line_normal.set_data(normal_data['Index'], normal_data['Normal'])
+
+                # 축 한계 업데이트 
+                ax.relim()
+                ax.autoscale_view()
+
+                plt.draw()  # 업데이트된 데이터 그리기
+                plt.pause(0.01) 
                 
-                # 그래프 생성
-                plt.figure(figsize=(10, 5))
-                plt.plot(outliers_data['Index'], outliers_data['Outliers'], 'ro', label='Outlier')
-                plt.plot(normal_data['Index'], normal_data['Normal'], 'b-', label='Inlier')
-                
-                # 그래프 제목 및 레이블
-                plt.title('Anomaly Detection')
-                plt.xlabel('Index')
-                plt.ylabel('Predicted Power Consumption Value')
-                plt.legend()
-                plt.show()
-                
-                # 그래프 업데이트 시간을 현재 시간으로 갱신
+                # 그래프 업데이트 시간을 갱신
                 last_graph_update_time = time.time()
         time.sleep(5)
 
