@@ -7,6 +7,12 @@ import requests
 import warnings
 import numpy as np
 import pandas as pd
+import firebase_admin
+from firebase_admin import credentials, db
+from firebase_admin import initialize_app
+# import streamlit as st
+from bokeh.plotting import figure, curdoc
+from bokeh.models import LinearColorMapper, ColorBar, ColumnDataSource, Legend, HoverTool, TableColumn, DataTable, CustomJS, TapTool, Range1d
 
 import time
 import calendar
@@ -52,9 +58,11 @@ last_graph_update_time = time.time()
 plt.ion()  # 인터랙티브 모드 활성화
 fig, ax = plt.subplots(figsize=(10, 5))
 
-# 초기 그래프 생성
+# 초기 빈 그래프 생성
 line_outliers, = ax.plot([], [], 'ro', label='Outlier')
 line_normal, = ax.plot([], [], 'b-', label='Inlier')
+
+# 그래프 제목과 레이블 설정
 ax.set_title('Anomaly Detection')
 ax.set_xlabel('Index')
 ax.set_ylabel('Predicted Power Consumption Value')
@@ -239,12 +247,13 @@ while True:
                 line_outliers.set_data(outliers_data['Index'], outliers_data['Outliers'])
                 line_normal.set_data(normal_data['Index'], normal_data['Normal'])
 
-                # 축 한계 업데이트 
+                # 축 한계 업데이트 (필요시)
                 ax.relim()
                 ax.autoscale_view()
+                ax.axhline(y=TARGET_MONTHLY_COST, color='r', linestyle='--', label='Threshold(9300)')
 
                 plt.draw()  # 업데이트된 데이터 그리기
-                plt.pause(0.01) 
+                plt.pause(0.01)  # 잠시 대기 (이때 창이 갱신됨)
                 
                 # 그래프 업데이트 시간을 갱신
                 last_graph_update_time = time.time()
