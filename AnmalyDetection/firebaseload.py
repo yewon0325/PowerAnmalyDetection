@@ -1,58 +1,53 @@
-import requests
-import json
 from datetime import datetime
+from firebase_admin import db
 
-# Firebase 설정 정보
-database_url = '인증키'
+def get_new_data(last_timestamp):
+    ref = db.reference('power_consumption')
+    if last_timestamp:
+        data_snapshot = ref.order_by_child('Timestamp').start_at(last_timestamp + 0.000001).get()
+    else:
+        data_snapshot = ref.order_by_child('Timestamp').get()
 
-# 새로운 데이터만 읽어오는 함수
-def get_new_data(last_key=None):
-    url = f'{database_url}/power_consumption.json'
-    response = requests.get(url)
-    
-    if response.status_code != 200:
-        print(f"Error fetching data: {response.status_code}")
-        return None, last_key  # 오류 발생 시, last_key도 반환
+    if data_snapshot is None:
+        data_snapshot = {}
 
-    data = response.json()
-    
     new_data = {}
+    for key in data_snapshot:
+        data_point = data_snapshot[key]
+        timestamp = data_point.get('Timestamp')
+        if timestamp is not None:
+            try:
+                timestamp = float(timestamp)
+            except (ValueError, TypeError):
+                print(f"Invalid timestamp value for key {key}: {timestamp}")
+                continue  # 해당 데이터 건너뜀
+            if last_timestamp is None or timestamp > last_timestamp:
+                data_point['Timestamp'] = timestamp  # 변환된 timestamp로 업데이트
+                new_data[key] = data_point
 
-    for key, value in data.items():
-        # last_key 이후의 데이터만 추가
-        if last_key is None or key > last_key:
-            new_data[key] = value
-
-    # 새로운 데이터가 있으면 가장 최신 key로 last_key 업데이트
     if new_data:
-        last_key = max(new_data.keys())  # 가장 최신 key로 last_key 설정
-        print(f"새로 감지된 데이터 개수: {len(new_data)} | 업데이트된 last_key: {last_key}")  # 디버깅 정보
+        new_last_timestamp = max(data_point['Timestamp'] for data_point in new_data.values())
+    else:
+        new_last_timestamp = last_timestamp
 
-    return new_data, last_key
+    return new_data, new_last_timestamp
 
-# 데이터 처리 함수
 def process_data(data):
-    if data is None:
-        print("No new data to process.")
-        return [], [], []
-
-    processed_data = []
+    keys = []
     timestamps = []
-    adjusted_powers = []
-
-    for key, value in data.items():
-        if 'Cumulative Energy Consumption (kWh)' not in value:
-            continue
-        
-        # 데이터 처리
-        timestamp = value['Timestamp']
-        adjusted_power = float(value['Cumulative Energy Consumption (kWh)'])/3600
-        processed_data.append({
-            'Timestamp': timestamp,
-            'Cumulative Energy Consumption (kWh)': adjusted_power,          
-        })
-        
-        timestamps.append(timestamp)
-        adjusted_powers.append(adjusted_power)
-
-    return processed_data, timestamps, adjusted_powers
+    power_values = []
+    for key, val in data.items():
+        if 'Timestamp' in val and 'PowerConsumption' in val:
+            try:
+                timestamp = float(val['Timestamp'])
+                power_value = float(val['PowerConsumption'])
+                timestamp_dt = datetime.fromtimestamp(timestamp)
+                timestamps.append(timestamp_dt)
+                power_values.append(power_value)
+                keys.append(key)
+            except (ValueError, TypeError) as e:
+                print(f"Error processing data for key {key}: {e}")
+                continue
+        else:
+            print(f"Data with key {key} is missing 'Timestamp' or 'PowerConsumption'")
+    return keys, timestamps, power_values
