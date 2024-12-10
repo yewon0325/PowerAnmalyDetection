@@ -1,7 +1,0 @@
-firebase-admin
-requests
-statsmodels
-numpy
-pandas
-bokeh
-matplotlib
