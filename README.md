@@ -28,3 +28,14 @@
 
 
 ![image](https://github.com/user-attachments/assets/cf82929e-ab6d-4c2c-a30f-0b30f35cbfc9)
+
+
+
+##팀장 : 이예원
+팀원
+-이도현
+-이유정
+-최지호
+
+
+
