@@ -6,9 +6,9 @@ from datetime import datetime
 
 # Firebase Admin SDK 초기화
 if not firebase_admin._apps:
-    cred = credentials.Certificate('')
+    cred = credentials.Certificate('./anomaly-detection-9939e-firebase-adminsdk-l9emo-0138e39dc1.json')
     firebase_admin.initialize_app(cred, {
-        'databaseURL': 
+        'databaseURL': 'https://anomaly-detection-9939e-default-rtdb.asia-southeast1.firebasedatabase.app/'
     })
 
 # 데이터 추가 함수
