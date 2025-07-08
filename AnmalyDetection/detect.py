@@ -45,6 +45,7 @@ RATE_PER_KWH3 = 307.3  # 전력량 요금 (원/kWh) 3구간
 BASE_RATE_TIER1 = 910   # 전력량 기본 요금 1구간
 BASE_RATE_TIER2 = 1600  # 전력량 기본 요금 2구간
 BASE_RATE_TIER3 = 7300  # 전력량 기본 요금 3구간
+print()
 
 # 데이터 저장용 리스트
 adjusted_powers_kw = []  # 실시간 전력 소비량 (kW) 리스트
